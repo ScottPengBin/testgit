@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"os/exec"
@@ -20,7 +21,7 @@ func main() {
 	currentBranch, _ := exec.Command("git", "symbolic-ref", "--short", "HEAD").CombinedOutput()
 	currentBranchName := strings.Trim(string(currentBranch), " ")
 	if strings.Contains(currentBranchName, "fatal: not a git repository") {
-		panic("当前目录没有git")
+		errors.New("当前目录没有git")
 	}
 
 	fmt.Println("当前分支:", currentBranchName)
@@ -29,7 +30,7 @@ func main() {
 
 }
 
-func getCommitInfo() string {
+func getCommitInfo() (string, error) {
 	defaultUserName, _ := exec.Command("git", "config", "user.name").CombinedOutput()
 
 	var c commitInfo
@@ -64,18 +65,19 @@ func getCommitInfo() string {
 	}
 
 	if !isTapd {
-		panic("请输入关联TAPD信息")
+		errors.New("请输入关联TAPD信息")
 	}
 
 	if !isCommitInfo {
-		panic("请输入提交信息")
+		errors.New("请输入提交信息")
 	}
 	fmt.Println("确认提交信息：" + commitInfo)
 	res := scanLn("1：确认 其他:取消")
 	if res == "1" {
-		return commitInfo
+		return commitInfo, nil
 	}
-	panic("你已经取消")
+	return "", errors.New("你已经取消")
+
 }
 
 func doCommit(currentBranchName string) {
@@ -87,9 +89,8 @@ func doCommit(currentBranchName string) {
 		checkBranchExist(versionBranchName)
 		targetBranchName := scanLn("请输入目标分支:")
 		checkBranchExist(targetBranchName)
-		info := getCommitInfo()
+		info, err := getCommitInfo()
 		add(info)
-		pullBranch(currentBranchName)
 		pushBranch(currentBranchName)
 
 		checkOutBranch(versionBranchName)
@@ -105,7 +106,6 @@ func doCommit(currentBranchName string) {
 	case 2:
 		info := getCommitInfo()
 		add(info)
-		pullBranch(currentBranchName)
 		pushBranch(currentBranchName)
 	case 3:
 		needMerge := scanLn("请输入需要合并的分支:")
@@ -139,10 +139,10 @@ func pullBranch(branchName string) {
 	strRes := strings.Trim(string(res), "\n")
 	fmt.Println(strRes)
 	if strings.Contains(strRes, "Automatic merged failed") {
-		panic("当前分支有冲突")
+		errors.New("当前分支有冲突")
 	}
 	if strings.Contains(strRes, "fatal: invalid") {
-		panic("没有权限")
+		errors.New("没有权限")
 	}
 }
 
@@ -161,7 +161,7 @@ func mergeBranch(branchName string) {
 	res, _ := exec.Command("git", "merge", branchName).CombinedOutput()
 	strRes := strings.Trim(string(res), "\n")
 	if strings.Contains(strRes, "Automatic merged failed") {
-		panic("合并到分支有冲突需要手动合并")
+		errors.New("合并到分支有冲突需要手动合并")
 	}
 }
 
@@ -186,6 +186,6 @@ func checkBranchExist(branchName string) {
 	res, _ := exec.Command("git", "rev-parse", "--verify", branchName).CombinedOutput()
 	strRes := strings.Trim(string(res), "\n")
 	if strRes == "fatal: Needed a single revision" {
-		panic("分支：" + branchName + "不存在")
+		errors.New("分支：" + branchName + "不存在")
 	}
 }
