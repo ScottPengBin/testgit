@@ -10,23 +10,29 @@ import (
 )
 
 type commitInfo struct {
-	User    string `json:"user"`
-	Task    string `json:"task"`
-	Story   string `json:"story"`
-	Bug     string `json:"bug"`
-	Message string `json:"message"`
+	User      string `json:"user"`
+	Task      string `json:"task"`
+	Story     string `json:"story"`
+	Bug       string `json:"bug"`
+	Message   string `json:"message"`
+	Exception string `json:"exception"`
 }
 
 func main() {
 	currentBranch, _ := exec.Command("git", "symbolic-ref", "--short", "HEAD").CombinedOutput()
 	currentBranchName := strings.Trim(string(currentBranch), " ")
 	if strings.Contains(currentBranchName, "fatal: not a git repository") {
-		errors.New("当前目录没有git")
+		fmt.Println("当前目录没有git")
+		return
 	}
 
 	fmt.Println("当前分支:", currentBranchName)
 
-	doCommit(currentBranchName)
+	err := doCommit(currentBranchName)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
 
 }
 
@@ -40,6 +46,7 @@ func getCommitInfo() (string, error) {
 	flag.StringVar(&c.Story, "s", "", "--story=[story id]")
 	flag.StringVar(&c.Bug, "b", "", "--bug=[bug id]")
 	flag.StringVar(&c.Message, "m", "", "提交信息")
+	flag.StringVar(&c.Exception, "e", "false", "排除")
 	flag.Parse()
 
 	commitInfo := "--user=" + c.User
@@ -61,15 +68,21 @@ func getCommitInfo() (string, error) {
 
 	if c.Message != "" {
 		isCommitInfo = true
-		commitInfo += " " + c.Message
+		if isTapd == true{
+			commitInfo += " " + c.Message
+		}else {
+			commitInfo = c.Message
+		}
+
 	}
 
-	if !isTapd {
-		errors.New("请输入关联TAPD信息")
+
+	if !isTapd && c.Exception == "false" {
+		return "",errors.New("请输入关联TAPD信息")
 	}
 
 	if !isCommitInfo {
-		errors.New("请输入提交信息")
+		return "",errors.New("请输入提交信息")
 	}
 	fmt.Println("确认提交信息：" + commitInfo)
 	res := scanLn("1：确认 其他:取消")
@@ -80,50 +93,115 @@ func getCommitInfo() (string, error) {
 
 }
 
-func doCommit(currentBranchName string) {
+func doCommit(currentBranchName string) error {
 	commitType := scanLn("请输入提交模式 1)开发分支+版本分支+目标分支  2)提交当前分支  3)分支合并到另一分支 : ")
 	ct, _ := strconv.Atoi(commitType)
+
 	switch ct {
 	case 1:
 		versionBranchName := scanLn("请输入版本分支:")
-		checkBranchExist(versionBranchName)
+		err := checkBranchExist(versionBranchName)
+		if err != nil {
+			return err
+		}
+
 		targetBranchName := scanLn("请输入目标分支:")
-		checkBranchExist(targetBranchName)
-		info, err := getCommitInfo()
+		err = checkBranchExist(targetBranchName)
+		if err != nil {
+			return err
+		}
+
+		info, coErr := getCommitInfo()
+		if coErr != nil {
+			return coErr
+		}
 		add(info)
-		pushBranch(currentBranchName)
+
+		err = pushBranch(currentBranchName)
+		if err != nil {
+			return err
+		}
 
 		checkOutBranch(versionBranchName)
-		pullBranch(versionBranchName)
-		mergeBranch(currentBranchName)
-		pushBranch(versionBranchName)
+		err = pullBranch(versionBranchName)
+		if err != nil {
+			return err
+		}
+
+		err = mergeBranch(currentBranchName)
+		if err != nil {
+			return err
+		}
+
+		err = pushBranch(versionBranchName)
+		if err != nil {
+			return err
+		}
 
 		checkOutBranch(targetBranchName)
-		pullBranch(targetBranchName)
-		mergeBranch(versionBranchName)
-		pushBranch(targetBranchName)
+		err = pullBranch(targetBranchName)
+		if err != nil {
+			return err
+		}
+
+		err = mergeBranch(versionBranchName)
+		if err != nil {
+			return err
+		}
+
+		err = pushBranch(targetBranchName)
+		if err != nil {
+			return err
+		}
 
 	case 2:
-		info := getCommitInfo()
+		info, coErr := getCommitInfo()
+		if coErr != nil {
+			return coErr
+		}
 		add(info)
-		pushBranch(currentBranchName)
+		err := pushBranch(currentBranchName)
+		if err != nil {
+			return err
+		}
 	case 3:
 		needMerge := scanLn("请输入需要合并的分支:")
-		checkBranchExist(needMerge)
+		err := checkBranchExist(needMerge)
+		if err != nil {
+			return err
+		}
 		targetBranchName := scanLn("请输入目标分支:")
-		checkBranchExist(targetBranchName)
+		err = checkBranchExist(targetBranchName)
+		if err != nil {
+			return err
+		}
 
-		pullBranch(needMerge)
+		err = pullBranch(needMerge)
+		if err != nil {
+			return err
+		}
 
 		checkOutBranch(targetBranchName)
-		pullBranch(targetBranchName)
-		mergeBranch(needMerge)
-		pushBranch(targetBranchName)
+		err = pullBranch(targetBranchName)
+		if err != nil {
+			return err
+		}
+
+		err = mergeBranch(needMerge)
+		if err != nil {
+			return err
+		}
+
+		err = pushBranch(targetBranchName)
+		if err != nil {
+			return err
+		}
 
 	default:
 		fmt.Println("输入不合法")
-		doCommit(currentBranchName)
+		return doCommit(currentBranchName)
 	}
+	return nil
 }
 
 func add(info string) {
@@ -133,36 +211,46 @@ func add(info string) {
 	exec.Command("git", "commit", "-m", info).Run()
 }
 
-func pullBranch(branchName string) {
+func pullBranch(branchName string) error {
 	fmt.Println("git pull origin " + branchName)
 	res, _ := exec.Command("git", "pull", "origin", branchName).CombinedOutput()
 	strRes := strings.Trim(string(res), "\n")
 	fmt.Println(strRes)
 	if strings.Contains(strRes, "Automatic merged failed") {
-		errors.New("当前分支有冲突")
+		return errors.New("当前分支有冲突")
 	}
 	if strings.Contains(strRes, "fatal: invalid") {
-		errors.New("没有权限")
+		return errors.New("没有权限")
 	}
+	return nil
 }
 
-func pushBranch(branchName string) {
+func pushBranch(branchName string) error {
 	fmt.Println("git push origin " + branchName)
 	res, _ := exec.Command("git", "push", "origin", branchName).CombinedOutput()
 	strRes := strings.Trim(string(res), "\n")
 	if strings.Contains(strRes, "gti pull ...") {
-		pullBranch(branchName)
-		pushBranch(branchName)
+		err := pullBranch(branchName)
+		if err != nil {
+			return err
+		}
+		err2 := pushBranch(branchName)
+		if err2 != nil {
+			return err2
+		}
 	}
+	return nil
 }
 
-func mergeBranch(branchName string) {
+func mergeBranch(branchName string) error {
 	fmt.Println("git merge " + branchName)
 	res, _ := exec.Command("git", "merge", branchName).CombinedOutput()
 	strRes := strings.Trim(string(res), "\n")
 	if strings.Contains(strRes, "Automatic merged failed") {
-		errors.New("合并到分支有冲突需要手动合并")
+		return errors.New("合并到分支有冲突需要手动合并")
+
 	}
+	return nil
 }
 
 func checkOutBranch(branchName string) {
@@ -182,10 +270,11 @@ func scanLn(message string) string {
 }
 
 //判断分支是否存在
-func checkBranchExist(branchName string) {
+func checkBranchExist(branchName string) error {
 	res, _ := exec.Command("git", "rev-parse", "--verify", branchName).CombinedOutput()
 	strRes := strings.Trim(string(res), "\n")
 	if strRes == "fatal: Needed a single revision" {
-		errors.New("分支：" + branchName + "不存在")
+		return errors.New("分支：" + branchName + "不存在")
 	}
+	return nil
 }
