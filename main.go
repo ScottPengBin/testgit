@@ -9,14 +9,10 @@ import (
 	"strings"
 )
 
-type commitInfo struct {
-	User      string `json:"user"`
-	Task      string `json:"task"`
-	Story     string `json:"story"`
-	Bug       string `json:"bug"`
-	Message   string `json:"message"`
-	Exception string `json:"exception"`
-}
+var (
+	h, e          bool
+	u, t, s, b, m string
+)
 
 func main() {
 	currentBranch, _ := exec.Command("git", "symbolic-ref", "--short", "HEAD").CombinedOutput()
@@ -28,6 +24,13 @@ func main() {
 
 	fmt.Println("当前分支:", currentBranchName)
 
+	flag.Parse()
+
+	if h {
+		flag.Usage()
+		return
+	}
+
 	err := doCommit(currentBranchName)
 	if err != nil {
 		fmt.Println(err.Error())
@@ -36,56 +39,56 @@ func main() {
 
 }
 
-func getCommitInfo() (string, error) {
+func init() {
 	defaultUserName, _ := exec.Command("git", "config", "user.name").CombinedOutput()
 
-	var c commitInfo
+	flag.BoolVar(&h, "h", false, "this help")
+	flag.StringVar(&u, "u", strings.Trim(string(defaultUserName), "\n"), "--user=[user nick](默认为git config user.name)")
+	flag.StringVar(&t, "t", "", "--task=[task id]")
+	flag.StringVar(&s, "s", "", "--story=[story id]")
+	flag.StringVar(&b, "b", "", "--bug=[bug id]")
+	flag.StringVar(&m, "m", "", "提交信息")
+	flag.BoolVar(&e, "e", false, "是否排除关联tapd 默认关联")
+}
 
-	flag.StringVar(&c.User, "u", strings.Trim(string(defaultUserName), "\n"), "--user=[user nick](默认为git config user.name)")
-	flag.StringVar(&c.Task, "t", "", "--task=[task id]")
-	flag.StringVar(&c.Story, "s", "", "--story=[story id]")
-	flag.StringVar(&c.Bug, "b", "", "--bug=[bug id]")
-	flag.StringVar(&c.Message, "m", "", "提交信息")
-	flag.StringVar(&c.Exception, "e", "false", "排除")
-	flag.Parse()
+func getCommitInfo() (string, error) {
 
-	commitInfo := "--user=" + c.User
+	commitInfo := "--user=" + u
 
 	var isTapd, isCommitInfo = false, false
 
-	if c.Task != "" {
+	if t != "" {
 		isTapd = true
-		commitInfo += " --task=" + c.Task
+		commitInfo += " --task=" + t
 	}
-	if c.Story != "" {
+	if s != "" {
 		isTapd = true
-		commitInfo += " --story=" + c.Story
+		commitInfo += " --story=" + s
 	}
-	if c.Bug != "" {
+	if b != "" {
 		isTapd = true
-		commitInfo += " --bug=" + c.Bug
+		commitInfo += " --bug=" + b
 	}
 
-	if c.Message != "" {
+	if m != "" {
 		isCommitInfo = true
-		if isTapd == true{
-			commitInfo += " " + c.Message
-		}else {
-			commitInfo = c.Message
+		if isTapd == true {
+			commitInfo += " " + m
+		} else {
+			commitInfo = m
 		}
 
 	}
 
-
-	if !isTapd && c.Exception == "false" {
-		return "",errors.New("请输入关联TAPD信息")
+	if !isTapd && e == false {
+		return "", errors.New("请输入关联TAPD信息")
 	}
 
 	if !isCommitInfo {
-		return "",errors.New("请输入提交信息")
+		return "", errors.New("请输入提交信息")
 	}
 	fmt.Println("确认提交信息：" + commitInfo)
-	res := scanLn("1：确认 其他:取消")
+	res := scanLn("1:确认 其他:取消  : ")
 	if res == "1" {
 		return commitInfo, nil
 	}
@@ -206,7 +209,7 @@ func doCommit(currentBranchName string) error {
 
 func add(info string) {
 	fmt.Println("git add .")
-	exec.Command("git", "add", ".").Run()
+	_ = exec.Command("git", "add", ".").Run()
 	fmt.Println("git commit -m '" + info + "'")
 	exec.Command("git", "commit", "-m", info).Run()
 }
@@ -229,6 +232,7 @@ func pushBranch(branchName string) error {
 	fmt.Println("git push origin " + branchName)
 	res, _ := exec.Command("git", "push", "origin", branchName).CombinedOutput()
 	strRes := strings.Trim(string(res), "\n")
+	fmt.Println(strRes)
 	if strings.Contains(strRes, "gti pull ...") {
 		err := pullBranch(branchName)
 		if err != nil {
