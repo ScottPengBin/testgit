@@ -121,7 +121,10 @@ func doCommit(currentBranchName string) error {
 		if coErr != nil {
 			return coErr
 		}
-		add(info)
+		err = add(info)
+		if err != nil {
+			return err
+		}
 
 		err = pushBranch(currentBranchName)
 		if err != nil {
@@ -165,8 +168,11 @@ func doCommit(currentBranchName string) error {
 		if coErr != nil {
 			return coErr
 		}
-		add(info)
-		err := pushBranch(currentBranchName)
+		err := add(info)
+		if err != nil {
+			return err
+		}
+		err = pushBranch(currentBranchName)
 		if err != nil {
 			return err
 		}
@@ -210,11 +216,16 @@ func doCommit(currentBranchName string) error {
 	return nil
 }
 
-func add(info string) {
+func add(info string) error {
 	fmt.Println("git add .")
 	_ = exec.Command("git", "add", ".").Run()
 	fmt.Println("git commit -m '" + info + "'")
-	exec.Command("git", "commit", "-m", info).Run()
+	res, _ := exec.Command("git", "commit", "-m", info).CombinedOutput()
+	strRes := strings.Trim(string(res), "\n")
+	if strings.Contains(strRes, "nothing to commit") {
+		return errors.New("没有提交的内容")
+	}
+	return nil
 }
 
 func pullBranch(branchName string) error {
