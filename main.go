@@ -16,7 +16,7 @@ var (
 
 func main() {
 	currentBranch, _ := exec.Command("git", "symbolic-ref", "--short", "HEAD").CombinedOutput()
-	currentBranchName := strings.Trim(string(currentBranch), " ")
+	currentBranchName := strings.Trim(string(currentBranch), "\n")
 	if strings.Contains(currentBranchName, "fatal: not a git repository") {
 		fmt.Println("当前目录没有git")
 		return
@@ -269,7 +269,7 @@ func scanLn(message string) string {
 	if commitType == "" {
 		return scanLn(message)
 	} else {
-		return commitType
+		return strings.Trim(commitType, "\n")
 	}
 }
 
