@@ -257,6 +257,10 @@ func mergeBranch(branchName string) error {
 		return errors.New("合并到分支有冲突需要手动合并")
 
 	}
+	if strings.Contains(strRes, "error") {
+		return errors.New("合并到分支有冲突需要手动合并")
+
+	}
 	return nil
 }
 
