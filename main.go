@@ -26,6 +26,7 @@ func main() {
 
 	flag.Parse()
 
+	//帮助信息
 	if h {
 		flag.Usage()
 		return
@@ -51,6 +52,7 @@ func init() {
 	flag.BoolVar(&e, "e", false, "是否排除关联tapd 默认关联")
 }
 
+//获取commit 信息
 func getCommitInfo() (string, error) {
 
 	commitInfo := "--user=" + u
@@ -96,6 +98,7 @@ func getCommitInfo() (string, error) {
 
 }
 
+//根据不同类型提交
 func doCommit(currentBranchName string) error {
 	commitType := scanLn("请输入提交模式 1)开发分支+版本分支+目标分支  2)提交当前分支  3)分支合并到另一分支 : ")
 	ct, _ := strconv.Atoi(commitType)
