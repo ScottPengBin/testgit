@@ -264,7 +264,7 @@ func mergeBranch(branchName string) error {
 	fmt.Println("git merge " + branchName)
 	res, _ := exec.Command("git", "merge", branchName).CombinedOutput()
 	strRes := strings.Trim(string(res), "\n")
-	if strings.Contains(strRes, "Automatic merged failed") {
+	if strings.Contains(strRes, "Automatic merged failed") || strings.Contains(strRes, "Automatic merge failed") {
 		return errors.New("合并到分支有冲突需要手动合并")
 
 	}
